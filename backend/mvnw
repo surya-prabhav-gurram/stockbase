@@ -1,0 +1,19 @@
+#!/bin/sh
+# Maven Wrapper Script
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.
+
+MAVEN_WRAPPER_JAR="./.mvn/wrapper/maven-wrapper.jar"
+MAVEN_WRAPPER_PROPERTIES="./.mvn/wrapper/maven-wrapper.properties"
+DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"
+
+if [ -r "$MAVEN_WRAPPER_JAR" ]; then
+  :
+elif command -v mvn > /dev/null 2>&1; then
+  exec mvn "$@"
+fi
+
+java -cp ".mvn/wrapper/maven-wrapper.jar" \
+  "-Dmaven.multiModuleProjectDirectory=$0" \
+  org.apache.maven.wrapper.MavenWrapperMain "$@"
