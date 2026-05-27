@@ -1,9 +1,47 @@
+<div >
+
 # StockBase — Full Stack Inventory Management System
+</div>
 
-A production-grade inventory management system built with **React**, **Spring Boot**, and **PostgreSQL**.
+---
 
-**Resume bullet:**
-> Built a full-stack Inventory Management System using React, Spring Boot, and PostgreSQL with JWT authentication, role-based access control, inventory transaction tracking, low-stock alerts, supplier management, reporting dashboards, and RESTful API integration.
+## Live Application
+
+Frontend:
+
+```text
+https://fanciful-narwhal-46443d.netlify.app/
+```
+
+Backend API:
+
+```text
+https://stockbase-rpe7.onrender.com
+```
+
+Note: The backend is deployed on Render free tier. If inactive, the first request may take 30 to 60 seconds while the service wakes up.
+
+---
+
+## Overview
+
+StockBase is a production-grade full-stack inventory management system built with **React**, **Spring Boot**, and **PostgreSQL**.
+
+The application supports secure user authentication, role-based access control, inventory tracking, product management, stock transaction auditing, low-stock alerts, supplier and category management, reporting dashboards, and CSV export functionality.
+
+This project demonstrates a complete cloud-deployed full-stack architecture using:
+
+```text
+React Frontend       → Netlify
+Spring Boot Backend  → Render Docker Deployment
+PostgreSQL Database  → Neon Cloud Database
+```
+
+---
+
+## Resume Bullet
+
+> Built and deployed a full-stack Inventory Management System using React, Spring Boot, PostgreSQL, Netlify, Render, and Neon, featuring JWT authentication, role-based access control, inventory transaction tracking, low-stock alerts, supplier management, reporting dashboards, CSV export functionality, and RESTful API integration.
 
 ---
 
@@ -12,190 +50,362 @@ A production-grade inventory management system built with **React**, **Spring Bo
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, React Router, Recharts, Axios |
-| Backend | Spring Boot 3.2 (Java 17) |
-| Database | PostgreSQL |
-| Auth | Spring Security + JWT (jjwt) |
-| ORM | Spring Data JPA / Hibernate |
+| Backend | Spring Boot 3.2, Java 17 |
+| Database | PostgreSQL hosted on Neon |
+| Authentication | Spring Security, JWT |
+| ORM | Spring Data JPA, Hibernate |
 | Validation | Jakarta Bean Validation |
+| Charts | Recharts |
 | CSV Export | Apache Commons CSV |
-| Deployment | Netlify (frontend) + Render/Railway (backend) + Neon/Supabase (DB) |
+| Backend Deployment | Render using Docker |
+| Frontend Deployment | Netlify |
+| Database Deployment | Neon PostgreSQL |
 
 ---
 
 ## Features
 
 ### Authentication & Authorization
-- JWT-based login/register
-- Role-based access: **ADMIN** can create/edit/delete; **USER** can view and record transactions
-- Token stored in localStorage, attached to all API requests via Axios interceptor
-- Auto-redirect to `/login` on 401
 
-### Products
-- Full CRUD with unique SKU validation
+- JWT-based login and registration
+- Role-based access control
+- ADMIN users can create, update, and delete records
+- USER accounts can view inventory and record transactions
+- Token stored in localStorage
+- Axios interceptor attaches JWT token to API requests
+- Auto-redirect to login on unauthorized requests
+- Spring Security protected backend routes
+
+---
+
+### Product Management
+
+- Full product CRUD operations
+- Unique SKU validation
+- Product name and SKU search
+- Category-based filtering
+- Supplier association
 - Per-product reorder threshold
-- Filter by category, status, search by name/SKU
-- Automatic status: In Stock / Low Stock / Out of Stock
+- Automatic inventory status calculation
 
-### Inventory Transactions
-- Stock In, Stock Out, Manual Adjustment
-- Full audit log: who, when, before/after quantities
-- Prevents over-withdrawing (insufficient stock error)
+Product status values:
 
-### Reorder Alerts
-- Real-time list of all products at/below threshold
-- Suggested restock quantity
-- One-click quick restock modal
-
-### Reports (Admin only)
-- Inventory value by category (bar chart)
-- Supplier-wise inventory (bar chart + table)
-- Low stock report
-- Export to CSV: all products, low-stock items
-
-### Data Model
-```
-users           categories      suppliers
-  ↑                 ↑               ↑
-  └── inventory_transactions    products ─┘
-                                   │
-                              (FK: category_id, supplier_id)
+```text
+In Stock
+Low Stock
+Out of Stock
 ```
 
 ---
 
-## Quick Start (Local Dev)
+### Inventory Transactions
 
-### Prerequisites
-- Java 17+ (`java --version`)
-- Node.js 18+ (`node --version`)
-- PostgreSQL 14+ running locally
+- Stock In
+- Stock Out
+- Manual Adjustment
+- Quantity validation
+- Prevents over-withdrawing when stock is insufficient
+- Records transaction type, user, timestamp, and quantity changes
+- Maintains full inventory audit history
 
-### 1. Database Setup
-```sql
-CREATE DATABASE stockbase;
+---
+
+### Reorder Alerts
+
+- Detects products at or below reorder threshold
+- Displays real-time low-stock alerts
+- Provides suggested restock quantity
+- Supports quick restock workflow
+
+---
+
+### Reports
+
+- Inventory value by category
+- Supplier-wise inventory report
+- Low-stock report
+- Interactive dashboard charts using Recharts
+- CSV export for product inventory
+- CSV export for low-stock products
+
+---
+
+## Demo Accounts
+
+```text
+Admin
+Email: admin@stockbase.com
+Password: admin123
+
+User
+Email: user@stockbase.com
+Password: user123
 ```
 
-### 2. Backend
-```bash
-cd backend
-# Edit src/main/resources/application.properties
-# Set: spring.datasource.username and spring.datasource.password
+---
 
-./mvnw spring-boot:run
-# API runs on http://localhost:8080
-# Seeds admin@stockbase.com / admin123 and user@stockbase.com / user123
+## Data Model
+
+```text
+users           categories      suppliers
+  ↑                 ↑               ↑
+  └── inventory_transactions    products
+                                   │
+                              category_id
+                              supplier_id
 ```
 
-### 3. Frontend
-```bash
-cd frontend
-npm install
-npm start
-# Opens http://localhost:3000
+---
+
+## System Architecture
+
+```text
+Client Browser
+     │
+     ▼
+React Frontend
+     │
+     ▼
+Axios API Layer
+     │
+     ▼
+Spring Boot REST API
+     │
+     ▼
+Spring Security + JWT
+     │
+     ▼
+Spring Data JPA / Hibernate
+     │
+     ▼
+Neon PostgreSQL Database
+```
+
+---
+
+## Cloud Deployment Architecture
+
+```text
+Netlify
+  └── Hosts React production build
+
+Render
+  └── Runs Spring Boot backend inside Docker container
+
+Neon
+  └── Hosts PostgreSQL production database
 ```
 
 ---
 
 ## REST API Reference
 
-### Auth
+### Authentication
+
 | Method | Endpoint | Access |
 |---|---|---|
 | POST | `/api/auth/register` | Public |
 | POST | `/api/auth/login` | Public |
 | GET | `/api/auth/me` | Authenticated |
 
+---
+
 ### Products
+
 | Method | Endpoint | Access |
 |---|---|---|
-| GET | `/api/products` | All |
-| GET | `/api/products/{id}` | All |
-| GET | `/api/products/low-stock` | All |
-| GET | `/api/products/search?q=` | All |
+| GET | `/api/products` | All authenticated users |
+| GET | `/api/products/{id}` | All authenticated users |
+| GET | `/api/products/low-stock` | All authenticated users |
+| GET | `/api/products/search?q=` | All authenticated users |
 | POST | `/api/products` | Admin |
 | PUT | `/api/products/{id}` | Admin |
 | DELETE | `/api/products/{id}` | Admin |
 
-### Transactions
-| Method | Endpoint | Access |
-|---|---|---|
-| GET | `/api/transactions` | All |
-| GET | `/api/transactions/recent?limit=20` | All |
-| GET | `/api/transactions/product/{id}` | All |
-| POST | `/api/transactions` | All |
+---
 
-### Reports
+### Transactions
+
 | Method | Endpoint | Access |
 |---|---|---|
-| GET | `/api/reports/dashboard` | All |
-| GET | `/api/reports/inventory-by-category` | All |
-| GET | `/api/reports/inventory-by-supplier` | All |
-| GET | `/api/reports/low-stock` | All |
-| GET | `/api/reports/export/products.csv` | All |
-| GET | `/api/reports/export/low-stock.csv` | All |
+| GET | `/api/transactions` | All authenticated users |
+| GET | `/api/transactions/recent?limit=20` | All authenticated users |
+| GET | `/api/transactions/product/{id}` | All authenticated users |
+| POST | `/api/transactions` | All authenticated users |
 
 ---
 
-## Deployment
+### Reports
 
-### Frontend → Netlify
+| Method | Endpoint | Access |
+|---|---|---|
+| GET | `/api/reports/dashboard` | All authenticated users |
+| GET | `/api/reports/inventory-by-category` | All authenticated users |
+| GET | `/api/reports/inventory-by-supplier` | All authenticated users |
+| GET | `/api/reports/low-stock` | All authenticated users |
+| GET | `/api/reports/export/products.csv` | All authenticated users |
+| GET | `/api/reports/export/low-stock.csv` | All authenticated users |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Java 17 or higher
+- Node.js 18 or higher
+- PostgreSQL 14 or higher
+- Maven
+
+---
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/stockbase.git
+cd stockbase
+```
+
+---
+
+### 2. Database Setup
+
+Create a local PostgreSQL database:
+
+```sql
+CREATE DATABASE stockbase;
+```
+
+---
+
+### 3. Backend Setup
+
+```bash
+cd backend
+mvn clean package -DskipTests
+mvn spring-boot:run
+```
+
+Backend runs on:
+
+```text
+http://localhost:8080
+```
+
+---
+
+### 4. Frontend Setup
+
 ```bash
 cd frontend
-npm run build
-# Drag the build/ folder to netlify.com/drop
-# Or: npx netlify-cli deploy --prod --dir=build
+npm install
+npm start
 ```
 
-### Backend → Render
-1. Push backend to a GitHub repo
-2. Create a new **Web Service** on render.com
-3. Set environment variables:
-   - `DATABASE_URL` = your Neon/Supabase PostgreSQL URL
-   - `JWT_SECRET` = a 256-bit random string
-   - `CORS_ORIGINS` = https://your-app.netlify.app
-   - `SPRING_PROFILES_ACTIVE` = prod
-4. Build command: `./mvnw clean package -DskipTests`
-5. Start command: `java -jar target/stockbase-api-1.0.0.jar`
+Frontend runs on:
 
-### Database → Neon (free PostgreSQL cloud)
-1. Sign up at neon.tech (free tier)
-2. Create a new project → copy the connection string
-3. Set as `DATABASE_URL` on Render
+```text
+http://localhost:3000
+```
 
-### Update frontend API URL for production
-In `frontend/src/api/index.js`, change:
+---
+
+## Environment Variables
+
+For production deployment, configure the following variables in Render:
+
+```env
+DATABASE_URL=your_jdbc_postgresql_url
+DATABASE_USERNAME=your_database_username
+DATABASE_PASSWORD=your_database_password
+JWT_SECRET=your_secure_jwt_secret
+SPRING_PROFILES_ACTIVE=prod
+CORS_ORIGINS=https://your-netlify-app.netlify.app
+```
+
+Important: Never commit real database credentials, passwords, or JWT secrets to GitHub.
+
+---
+
+## Docker Deployment
+
+The backend is deployed on Render using Docker.
+
+Example Dockerfile:
+
+```dockerfile
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY backend/pom.xml .
+COPY backend/src ./src
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/target/stockbase-api-1.0.0.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+---
+
+## Frontend Production API Configuration
+
+The frontend communicates with the deployed backend through Axios.
+
+Example:
+
 ```js
-const api = axios.create({ baseURL: 'https://your-api.onrender.com' });
+const api = axios.create({
+  baseURL: 'https://stockbase-rpe7.onrender.com'
+});
 ```
+
+---
+
+## Deployment Summary
+
+| Component | Platform | Status |
+|---|---|---|
+| Frontend | Netlify | Deployed |
+| Backend | Render | Deployed |
+| Database | Neon PostgreSQL | Deployed |
+| Authentication | JWT + Spring Security | Working |
+| Seed Data | DataSeeder | Loaded |
+| Reports | Recharts + REST API | Working |
 
 ---
 
 ## Project Structure
 
-```
+```text
 stockbase/
+├── Dockerfile
+├── render.yaml
 ├── backend/
 │   ├── pom.xml
 │   └── src/main/java/com/stockbase/
 │       ├── StockbaseApplication.java
 │       ├── config/
-│       │   ├── SecurityConfig.java     ← CORS, JWT filter chain, role rules
-│       │   └── DataSeeder.java         ← Seeds demo data on first run
-│       ├── controller/                 ← REST endpoints
-│       ├── service/                    ← Business logic
-│       ├── repository/                 ← JPA queries
-│       ├── model/                      ← JPA entities
-│       ├── security/                   ← JwtUtil, JwtFilter, UserDetailsService
-│       └── exception/                  ← GlobalExceptionHandler
+│       │   ├── SecurityConfig.java
+│       │   └── DataSeeder.java
+│       ├── controller/
+│       ├── service/
+│       ├── repository/
+│       ├── model/
+│       ├── security/
+│       └── exception/
 │
 └── frontend/
     ├── package.json
     ├── netlify.toml
     └── src/
-        ├── api/index.js               ← All Axios API calls
-        ├── context/AuthContext.js     ← JWT auth state
+        ├── api/
+        │   └── index.js
+        ├── context/
+        │   └── AuthContext.js
         ├── components/
-        │   ├── UI.js                  ← Shared icons, Toast, badges
+        │   ├── UI.js
         │   ├── Sidebar.js
         │   ├── ProductModal.js
         │   └── TransactionModal.js
@@ -209,3 +419,65 @@ stockbase/
             ├── Suppliers.js
             └── Reports.js
 ```
+
+---
+
+## Engineering Highlights
+
+- Full-stack production deployment
+- Dockerized Spring Boot backend
+- Cloud PostgreSQL database integration
+- JWT authentication and protected routes
+- Role-based access control
+- RESTful API architecture
+- Inventory transaction auditing
+- Real-time low-stock monitoring
+- Analytics dashboard with Recharts
+- CSV export functionality
+- Responsive React frontend
+- Cloud-ready environment variable configuration
+
+---
+
+## Future Improvements
+
+```text
+Docker Compose for local development
+CI/CD pipeline with GitHub Actions
+Redis caching for reports
+WebSocket-based real-time stock alerts
+Barcode scanner support
+Multi-warehouse inventory management
+AI-based demand forecasting
+Advanced sales and purchase order modules
+Unit and integration test coverage
+```
+
+---
+
+## Author
+
+**Surya Prabhav Gurram**  
+Master’s in Computer Science  
+University of Oklahoma
+
+Focus areas:
+
+```text
+Full-Stack Development
+Database Systems
+Artificial Intelligence
+Cloud Deployment
+Backend Engineering
+System Architecture
+```
+
+---
+
+<div align="center">
+
+<p>
+  <img src="https://readme-typing-svg.herokuapp.com?font=Inter&weight=500&size=18&duration=3500&pause=1000&center=true&vCenter=true&width=800&lines=Built+with+React%2C+Spring+Boot%2C+PostgreSQL%2C+Docker%2C+Netlify%2C+Render%2C+and+Neon;Designed+as+a+production-grade+inventory+management+platform" alt="Footer Animation" />
+</p>
+
+</div>
