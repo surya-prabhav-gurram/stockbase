@@ -186,8 +186,9 @@ flowchart LR
 
 Every API call flows through the same pipeline. Security is enforced twice: once at
 the URL level in the filter chain, and again at the method level via `@PreAuthorize`.
-Controllers return **DTOs**, never JPA entities, so persistence internals never reach
-the client.
+The transaction endpoints return a dedicated **DTO** (`TransactionResponse`) instead
+of the entity, so the acting user's details can't leak; the other read models expose
+no sensitive fields and are serialized directly.
 
 ```mermaid
 sequenceDiagram
@@ -211,7 +212,7 @@ sequenceDiagram
     DB-->>R: Result set
     R-->>S: Entities
     S-->>C: Domain result
-    C-->>B: JSON response DTO + HTTP status
+    C-->>B: JSON response + HTTP status
 ```
 
 ### 3. Backend layered design
@@ -350,7 +351,8 @@ sequenceDiagram
 |---|:---:|:---:|:---:|
 | `POST /api/auth/**`, `/actuator/health`, `/swagger-ui/**` | ✅ | ✅ | ✅ |
 | `GET /api/**` (reads) | ❌ | ✅ | ✅ |
-| `POST/PUT/DELETE /api/**` (writes) | ❌ | ❌ | ✅ |
+| Record stock movement (`POST /api/transactions`) | ❌ | ✅ | ✅ |
+| Product / category / supplier writes; run notifications | ❌ | ❌ | ✅ |
 
 ### 6. Concurrency control
 
@@ -429,7 +431,7 @@ flowchart TD
 |---|---|---|
 | Authentication | Stateless JWT (no server session) | Horizontal scalability; no sticky sessions or shared session store |
 | Concurrency | Pessimistic row lock (`SELECT ... FOR UPDATE`) | Guarantees no oversell with **no schema migration** on already-deployed data; chosen over optimistic `@Version` |
-| API contract | DTOs separate from JPA entities | Prevents leaking entity internals (e.g. password hash) and decouples wire format from schema |
+| API contract | DTO where it matters (`TransactionResponse`) | The transaction API would otherwise serialize the acting user's password hash; the DTO closes that. Other read models carry no sensitive fields and are returned directly |
 | Error handling | Central `@RestControllerAdvice` | Consistent JSON errors, correct status codes (e.g. 403 vs 500), no internal detail leakage |
 | Front end | React + TypeScript (SPA) | Type-safe end-to-end contract; a Next.js/SSR rewrite adds no value for an authenticated dashboard |
 | Integration | Interface + decoupled sweep | Unit-testable seam; notification failures never block core writes |
