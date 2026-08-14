@@ -1,0 +1,47 @@
+# Local multi-container stack: PostgreSQL + the Spring Boot backend.
+# Usage:  docker compose up --build
+# Backend on http://localhost:8080 (Swagger at /swagger-ui.html), Postgres on 5432.
+# The React frontend runs separately with `npm start` (it proxies to :8080).
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: stockbase
+      POSTGRES_USER: stockbase
+      POSTGRES_PASSWORD: stockbase
+    ports:
+      - "5432:5432"
+    volumes:
+      - stockbase_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockbase -d stockbase"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://db:5432/stockbase
+      DATABASE_USERNAME: stockbase
+      DATABASE_PASSWORD: stockbase
+      JWT_SECRET: change-me-to-a-real-256-bit-secret-in-any-real-deployment-000000
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  stockbase_pgdata:

@@ -3,20 +3,21 @@ import { getProducts, getCategories, getSuppliers, createProduct, updateProduct,
 import { Loading, StatusBadge, ConfirmModal, IconPlus, IconEdit, IconTrash, IconSearch } from '../components/UI';
 import ProductModal from '../components/ProductModal';
 import { useAuth } from '../context/AuthContext';
+import { Product, Category, Supplier, ProductRequest, PageProps } from '../types';
 
-export default function Products({ onToast }) {
+export default function Products({ onToast }: PageProps) {
   const { isAdmin } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [editProduct, setEditProduct] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -27,7 +28,7 @@ export default function Products({ onToast }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const getStatus = p => p.quantity === 0 ? 'Out of stock' : p.quantity <= p.reorderThreshold ? 'Low stock' : 'In stock';
+  const getStatus = (p: Product) => p.quantity === 0 ? 'Out of stock' : p.quantity <= p.reorderThreshold ? 'Low stock' : 'In stock';
 
   const filtered = products.filter(p => {
     const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
@@ -36,7 +37,7 @@ export default function Products({ onToast }) {
     return matchSearch && matchCat && matchStatus;
   });
 
-  const handleSave = async (data) => {
+  const handleSave = async (data: ProductRequest) => {
     setSaving(true);
     try {
       if (editProduct) {
@@ -49,17 +50,18 @@ export default function Products({ onToast }) {
         onToast('✓ Product added');
       }
       setShowModal(false); setEditProduct(null);
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error saving product'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
+    if (deleteId == null) return;
     try {
       await deleteProduct(deleteId);
       setProducts(prev => prev.filter(p => p.id !== deleteId));
       onToast('✓ Product deleted');
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error deleting product'));
     } finally { setDeleteId(null); }
   };
@@ -142,7 +144,7 @@ export default function Products({ onToast }) {
         />
       )}
 
-      {deleteId && (
+      {deleteId != null && (
         <ConfirmModal
           message="Are you sure you want to delete this product? This cannot be undone."
           onConfirm={handleDelete}

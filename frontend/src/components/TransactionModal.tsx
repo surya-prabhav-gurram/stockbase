@@ -1,24 +1,43 @@
 import React, { useState } from 'react';
 import { IconX } from './UI';
+import { Product, TransactionType, TransactionRequest } from '../types';
 
-const TYPE_LABELS = { STOCK_IN: 'Stock In', STOCK_OUT: 'Stock Out', ADJUSTMENT: 'Manual Adjustment' };
+const TYPE_LABELS: Record<TransactionType, string> = {
+  STOCK_IN: 'Stock In', STOCK_OUT: 'Stock Out', ADJUSTMENT: 'Manual Adjustment',
+};
 
-export default function TransactionModal({ products, onSave, onClose, loading, defaultProductId }) {
-  const [form, setForm] = useState({
-    productId: defaultProductId || '',
+interface TxForm {
+  productId: string;
+  type: TransactionType;
+  quantity: string;
+  reason: string;
+  notes: string;
+}
+
+interface TransactionModalProps {
+  products: Product[];
+  onSave: (data: TransactionRequest) => void;
+  onClose: () => void;
+  loading: boolean;
+  defaultProductId?: number | null;
+}
+
+export default function TransactionModal({ products, onSave, onClose, loading, defaultProductId }: TransactionModalProps) {
+  const [form, setForm] = useState<TxForm>({
+    productId: defaultProductId != null ? String(defaultProductId) : '',
     type: 'STOCK_IN',
     quantity: '',
     reason: '',
     notes: '',
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = <K extends keyof TxForm>(k: K, v: TxForm[K]) => setForm(f => ({ ...f, [k]: v }));
 
-  const validate = () => {
-    const e = {};
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
     if (!form.productId) e.productId = 'Select a product';
-    if (!form.quantity || isNaN(form.quantity) || Number(form.quantity) < 1) e.quantity = 'Enter a valid quantity (min 1)';
+    if (!form.quantity || isNaN(Number(form.quantity)) || Number(form.quantity) < 1) e.quantity = 'Enter a valid quantity (min 1)';
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -28,7 +47,7 @@ export default function TransactionModal({ products, onSave, onClose, loading, d
     onSave({
       productId: Number(form.productId),
       type: form.type,
-      quantity: parseInt(form.quantity),
+      quantity: parseInt(form.quantity, 10),
       reason: form.reason.trim(),
       notes: form.notes.trim(),
     });
@@ -47,7 +66,7 @@ export default function TransactionModal({ products, onSave, onClose, loading, d
           <div className="form-group">
             <label>Transaction Type *</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              {Object.entries(TYPE_LABELS).map(([val, label]) => (
+              {(Object.entries(TYPE_LABELS) as [TransactionType, string][]).map(([val, label]) => (
                 <button
                   key={val}
                   type="button"

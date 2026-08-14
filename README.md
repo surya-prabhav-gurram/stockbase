@@ -51,7 +51,7 @@ PostgreSQL Database  → Neon Cloud Database
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, React Router, Recharts, Axios |
+| Frontend | React 18 + TypeScript, React Router, Recharts, Axios |
 | Backend | Spring Boot 3.2, Java 17 |
 | Database | PostgreSQL hosted on Neon |
 | Authentication | Spring Security, JWT |
@@ -283,6 +283,8 @@ mvn test
 - **Interactive API docs.** OpenAPI 3 with Swagger UI at `/swagger-ui.html`, including a Bearer-JWT "Authorize" flow so endpoints can be exercised from the browser.
 - **Health & metrics.** Spring Boot Actuator exposes a public `/actuator/health` (used by the Render health check) and `/actuator/info`.
 - **Pagination & sorting.** `GET /api/products/page?page=0&size=20&sort=name` for large catalogs, alongside the existing full-list endpoint.
+- **External integration.** A `LowStockNotifier` bridges the inventory database to an external system: on a schedule (and on demand via `POST /api/notifications/low-stock/run`), it detects products newly at/below their reorder threshold and pushes an alert to a configurable Slack/Teams-compatible webhook. The transport sits behind a `NotificationSender` interface (unit-tested with a fake sender), and de-duplicates so a product isn't re-alerted until it recovers and drops again. Set `NOTIFICATIONS_WEBHOOK_URL` to enable; unset = logs only.
+- **Typed frontend.** The React app is written in **TypeScript** — typed domain models, a typed Axios API layer, typed context, and typed component props throughout.
 
 ---
 
@@ -294,6 +296,44 @@ mvn test
 | `/v3/api-docs` | OpenAPI JSON spec | Public |
 | `/actuator/health` | Liveness/health probe | Public |
 | `/actuator/info` | Build/app info | Public |
+
+---
+
+## Run It Locally (zero database setup)
+
+The fastest way to try the app — no PostgreSQL install required. The `local` profile
+runs on an in-memory H2 database and auto-seeds demo data.
+
+```bash
+# Backend (terminal 1) — http://localhost:8080
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+# Frontend (terminal 2) — http://localhost:3000
+cd frontend
+npm install
+npm start
+```
+
+Log in as `admin@stockbase.com / admin123` (admin) or `user@stockbase.com / user123` (read-only).
+Swagger UI: `http://localhost:8080/swagger-ui.html` · Health: `http://localhost:8080/actuator/health`.
+
+> On a JDK newer than 21, prefix the backend command with `JAVA_HOME=$(/usr/libexec/java_home -v 21)`
+> (macOS) so Lombok's annotation processor runs against a supported JDK.
+
+### Run with Docker Compose (PostgreSQL + backend)
+
+```bash
+docker compose up --build
+```
+
+Starts PostgreSQL and the backend (prod profile) together; backend on :8080.
+
+### Kubernetes / EKS
+
+Deployment and Service manifests live in `k8s/` — two replicas, resource requests/limits,
+and liveness/readiness probes wired to `/actuator/health`. Apply with `kubectl apply -f k8s/`
+after pushing an image and populating the `stockbase-secrets` Secret.
 
 ---
 

@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getLowStockReport } from '../api';
+import { getLowStockReport, getProducts, recordTransaction } from '../api';
 import { Loading, IconAlert, StatusBadge, IconPlus } from '../components/UI';
 import TransactionModal from '../components/TransactionModal';
-import { getProducts, recordTransaction } from '../api';
+import { Product, TransactionRequest, PageProps } from '../types';
 
-export default function ReorderAlerts({ onToast }) {
-  const [lowStock, setLowStock] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
+export default function ReorderAlerts({ onToast }: PageProps) {
+  const [lowStock, setLowStock] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -18,12 +18,12 @@ export default function ReorderAlerts({ onToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleReorder = (productId) => {
+  const handleReorder = (productId: number) => {
     setSelectedProductId(productId);
     setShowModal(true);
   };
 
-  const handleSave = async (data) => {
+  const handleSave = async (data: TransactionRequest) => {
     setSaving(true);
     try {
       await recordTransaction(data);
@@ -31,7 +31,7 @@ export default function ReorderAlerts({ onToast }) {
       setLowStock(res.data);
       onToast('✓ Stock updated');
       setShowModal(false);
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error'));
     } finally { setSaving(false); }
   };

@@ -2,20 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getInventoryByCategory, getInventoryBySupplier, getLowStockReport, exportProductsCsv, exportLowStockCsv } from '../api';
 import { Loading, IconDownload, StatusBadge } from '../components/UI';
+import { Product, PageProps } from '../types';
 
-const fmt = n => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n: number | string) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function downloadCsv(blob, filename) {
+interface CatDatum { name: string; value: number; }
+interface SupplierDatum { name: string; count: number; value: number; }
+
+function downloadCsv(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
 
-export default function Reports({ onToast }) {
-  const [catData, setCatData] = useState([]);
-  const [supplierData, setSupplierData] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
+export default function Reports({ onToast }: PageProps) {
+  const [catData, setCatData] = useState<CatDatum[]>([]);
+  const [supplierData, setSupplierData] = useState<SupplierDatum[]>([]);
+  const [lowStock, setLowStock] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,12 +32,14 @@ export default function Reports({ onToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleExport = async (type) => {
+  const handleExport = async (type: 'products' | 'lowstock') => {
     try {
       const res = type === 'products' ? await exportProductsCsv() : await exportLowStockCsv();
       downloadCsv(res.data, type === 'products' ? 'products.csv' : 'low-stock.csv');
       onToast('✓ CSV downloaded');
-    } catch { onToast('✗ Export failed'); }
+    } catch {
+      onToast('✗ Export failed');
+    }
   };
 
   if (loading) return <Loading text="Generating reports…" />;
@@ -60,8 +66,8 @@ export default function Reports({ onToast }) {
               <BarChart data={catData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={v => fmt(v)} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
                 <Bar dataKey="value" fill="#1D9E75" radius={[4, 4, 0, 0]} name="Value" />
               </BarChart>
             </ResponsiveContainer>
@@ -75,8 +81,8 @@ export default function Reports({ onToast }) {
               <BarChart data={supplierData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v, n) => n === 'value' ? fmt(v) : v} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={((v: any, n: any) => (n === 'value' ? fmt(v) : v)) as any} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
                 <Bar dataKey="value" fill="#185FA5" radius={[4, 4, 0, 0]} name="value" />
               </BarChart>
             </ResponsiveContainer>

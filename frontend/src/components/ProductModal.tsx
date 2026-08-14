@@ -1,11 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { IconX } from './UI';
+import { Product, Category, Supplier, ProductRequest } from '../types';
 
-const empty = { name: '', sku: '', description: '', price: '', quantity: '', reorderThreshold: '10', categoryId: '', supplierId: '' };
+interface ProductForm {
+  name: string;
+  sku: string;
+  description: string;
+  price: string;
+  quantity: string;
+  reorderThreshold: string;
+  categoryId: string;
+  supplierId: string;
+}
 
-export default function ProductModal({ product, categories, suppliers, onSave, onClose, loading }) {
-  const [form, setForm] = useState(empty);
-  const [errors, setErrors] = useState({});
+interface ProductModalProps {
+  product: Product | null;
+  categories: Category[];
+  suppliers: Supplier[];
+  onSave: (data: ProductRequest) => void;
+  onClose: () => void;
+  loading: boolean;
+}
+
+const empty: ProductForm = {
+  name: '', sku: '', description: '', price: '', quantity: '',
+  reorderThreshold: '10', categoryId: '', supplierId: '',
+};
+
+export default function ProductModal({ product, categories, suppliers, onSave, onClose, loading }: ProductModalProps) {
+  const [form, setForm] = useState<ProductForm>(empty);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (product) {
@@ -13,11 +37,11 @@ export default function ProductModal({ product, categories, suppliers, onSave, o
         name: product.name || '',
         sku: product.sku || '',
         description: product.description || '',
-        price: product.price ?? '',
-        quantity: product.quantity ?? '',
-        reorderThreshold: product.reorderThreshold ?? 10,
-        categoryId: product.category?.id || product.categoryId || '',
-        supplierId: product.supplier?.id || product.supplierId || '',
+        price: product.price != null ? String(product.price) : '',
+        quantity: product.quantity != null ? String(product.quantity) : '',
+        reorderThreshold: String(product.reorderThreshold ?? 10),
+        categoryId: product.category?.id != null ? String(product.category.id) : '',
+        supplierId: product.supplier?.id != null ? String(product.supplier.id) : '',
       });
     } else {
       setForm(empty);
@@ -25,14 +49,14 @@ export default function ProductModal({ product, categories, suppliers, onSave, o
     setErrors({});
   }, [product]);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: keyof ProductForm, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const validate = () => {
-    const e = {};
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = 'Required';
     if (!form.sku.trim()) e.sku = 'Required';
-    if (form.price === '' || isNaN(form.price) || Number(form.price) < 0) e.price = 'Valid price required';
-    if (form.quantity === '' || isNaN(form.quantity) || Number(form.quantity) < 0) e.quantity = 'Valid quantity required';
+    if (form.price === '' || isNaN(Number(form.price)) || Number(form.price) < 0) e.price = 'Valid price required';
+    if (form.quantity === '' || isNaN(Number(form.quantity)) || Number(form.quantity) < 0) e.quantity = 'Valid quantity required';
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -44,8 +68,8 @@ export default function ProductModal({ product, categories, suppliers, onSave, o
       sku: form.sku.trim().toUpperCase(),
       description: form.description.trim(),
       price: parseFloat(form.price),
-      quantity: parseInt(form.quantity),
-      reorderThreshold: parseInt(form.reorderThreshold) || 10,
+      quantity: parseInt(form.quantity, 10),
+      reorderThreshold: parseInt(form.reorderThreshold, 10) || 10,
       categoryId: form.categoryId ? Number(form.categoryId) : null,
       supplierId: form.supplierId ? Number(form.supplierId) : null,
     });

@@ -2,21 +2,28 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+  IconProps,
   IconDashboard, IconPackage, IconTag, IconTruck,
-  IconActivity, IconBarChart, IconAlert, IconLogout, IconShield
+  IconActivity, IconBarChart, IconAlert, IconLogout, IconShield,
 } from './UI';
 
-const navItems = [
-  { to: '/',            label: 'Dashboard',    icon: IconDashboard },
-  { to: '/products',    label: 'Products',     icon: IconPackage },
-  { to: '/transactions',label: 'Transactions', icon: IconActivity },
-  { to: '/reorder',     label: 'Reorder Alerts',icon: IconAlert },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.FC<IconProps>;
+}
+
+const navItems: NavItem[] = [
+  { to: '/',             label: 'Dashboard',     icon: IconDashboard },
+  { to: '/products',     label: 'Products',      icon: IconPackage },
+  { to: '/transactions', label: 'Transactions',  icon: IconActivity },
+  { to: '/reorder',      label: 'Reorder Alerts', icon: IconAlert },
 ];
 
-const adminItems = [
-  { to: '/categories',  label: 'Categories',   icon: IconTag },
-  { to: '/suppliers',   label: 'Suppliers',    icon: IconTruck },
-  { to: '/reports',     label: 'Reports',      icon: IconBarChart },
+const adminItems: NavItem[] = [
+  { to: '/categories', label: 'Categories', icon: IconTag },
+  { to: '/suppliers',  label: 'Suppliers',  icon: IconTruck },
+  { to: '/reports',    label: 'Reports',    icon: IconBarChart },
 ];
 
 export default function Sidebar() {

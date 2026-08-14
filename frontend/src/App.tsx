@@ -12,7 +12,7 @@ import Categories from './pages/Categories';
 import Suppliers from './pages/Suppliers';
 import Reports from './pages/Reports';
 
-const PAGE_TITLES = {
+const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard', '/products': 'Products', '/transactions': 'Transaction Log',
   '/reorder': 'Reorder Alerts', '/categories': 'Categories',
   '/suppliers': 'Suppliers', '/reports': 'Reports',
@@ -20,8 +20,8 @@ const PAGE_TITLES = {
 
 function ProtectedLayout() {
   const { user, loading, isAdmin } = useAuth();
-  const [toast, setToast] = useState(null);
-  const notify = msg => setToast(msg);
+  const [toast, setToast] = useState<string | null>(null);
+  const notify = (msg: string) => setToast(msg);
 
   if (loading) return <div className="loading"><div className="spinner" />Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;

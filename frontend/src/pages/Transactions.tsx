@@ -2,16 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getTransactions, getProducts, recordTransaction } from '../api';
 import { Loading, IconPlus } from '../components/UI';
 import TransactionModal from '../components/TransactionModal';
+import { Product, Transaction, TransactionType, TransactionRequest, PageProps } from '../types';
 
-function TxBadge({ type }) {
-  const map = { STOCK_IN: ['badge-green', '▲ Stock In'], STOCK_OUT: ['badge-red', '▼ Stock Out'], ADJUSTMENT: ['badge-blue', '⇌ Adjustment'] };
+function TxBadge({ type }: { type: TransactionType }) {
+  const map: Record<string, [string, string]> = {
+    STOCK_IN: ['badge-green', '▲ Stock In'],
+    STOCK_OUT: ['badge-red', '▼ Stock Out'],
+    ADJUSTMENT: ['badge-blue', '⇌ Adjustment'],
+  };
   const [cls, label] = map[type] || ['badge-gray', type];
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 
-export default function Transactions({ onToast }) {
-  const [txs, setTxs] = useState([]);
-  const [products, setProducts] = useState([]);
+export default function Transactions({ onToast }: PageProps) {
+  const [txs, setTxs] = useState<Transaction[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -26,21 +31,19 @@ export default function Transactions({ onToast }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleSave = async (data) => {
+  const handleSave = async (data: TransactionRequest) => {
     setSaving(true);
     try {
       const res = await recordTransaction(data);
       setTxs(prev => [res.data, ...prev]);
       onToast('✓ Transaction recorded');
       setShowModal(false);
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error recording transaction'));
     } finally { setSaving(false); }
   };
 
-  const filtered = filter
-    ? txs.filter(t => t.type === filter)
-    : txs;
+  const filtered = filter ? txs.filter(t => t.type === filter) : txs;
 
   if (loading) return <Loading text="Loading transactions…" />;
 

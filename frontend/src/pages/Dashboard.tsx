@@ -1,23 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getDashboardStats, getInventoryByCategory, getRecentTransactions } from '../api';
 import { Loading, IconAlert } from '../components/UI';
 import { Link } from 'react-router-dom';
+import { DashboardStats, Transaction, TransactionType } from '../types';
 
-const COLORS = ['#1D9E75','#185FA5','#854F0B','#5b21b6','#A32D2D','#0891b2'];
+const COLORS = ['#1D9E75', '#185FA5', '#854F0B', '#5b21b6', '#A32D2D', '#0891b2'];
 
-const fmt = n => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n: number | string) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function TxTypeBadge({ type }) {
-  const map = { STOCK_IN: ['badge-green', 'Stock In'], STOCK_OUT: ['badge-red', 'Stock Out'], ADJUSTMENT: ['badge-blue', 'Adjustment'] };
+interface CatDatum { name: string; value: number; }
+
+interface MetricCard {
+  label: string;
+  value: React.ReactNode;
+  sub: string;
+  subClass?: string;
+  color?: string;
+  fontSize?: number;
+}
+
+function TxTypeBadge({ type }: { type: TransactionType }) {
+  const map: Record<string, [string, string]> = {
+    STOCK_IN: ['badge-green', 'Stock In'], STOCK_OUT: ['badge-red', 'Stock Out'], ADJUSTMENT: ['badge-blue', 'Adjustment'],
+  };
   const [cls, label] = map[type] || ['badge-gray', type];
   return <span className={`badge ${cls}`}><span className="badge-dot" />{label}</span>;
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [catData, setCatData] = useState([]);
-  const [txs, setTxs] = useState([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [catData, setCatData] = useState<CatDatum[]>([]);
+  const [txs, setTxs] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,17 +44,19 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Loading text="Loading dashboard…" />;
+  if (loading || !stats) return <Loading text="Loading dashboard…" />;
+
+  const cards: MetricCard[] = [
+    { label: 'Total Products', value: stats.totalProducts, sub: 'in catalog' },
+    { label: 'In Stock', value: stats.inStockCount, sub: `${stats.totalProducts ? Math.round((stats.inStockCount / stats.totalProducts) * 100) : 0}% of catalog`, color: 'var(--green)' },
+    { label: 'Low / Out of Stock', value: `${stats.lowStockCount} / ${stats.outOfStockCount}`, sub: 'need attention', subClass: stats.lowStockCount > 0 ? 'warn' : '' },
+    { label: 'Inventory Value', value: fmt(stats.totalInventoryValue), sub: `${stats.totalTransactions} transactions`, fontSize: 20 },
+  ];
 
   return (
     <div>
       <div className="metrics-grid">
-        {[
-          { label: 'Total Products', value: stats.totalProducts, sub: 'in catalog' },
-          { label: 'In Stock', value: stats.inStockCount, sub: `${stats.totalProducts ? Math.round((stats.inStockCount / stats.totalProducts) * 100) : 0}% of catalog`, color: 'var(--green)' },
-          { label: 'Low / Out of Stock', value: `${stats.lowStockCount} / ${stats.outOfStockCount}`, sub: 'need attention', subClass: stats.lowStockCount > 0 ? 'warn' : '' },
-          { label: 'Inventory Value', value: fmt(stats.totalInventoryValue), sub: `${stats.totalTransactions} transactions`, fontSize: 20 },
-        ].map(({ label, value, sub, subClass, color, fontSize }) => (
+        {cards.map(({ label, value, sub, subClass, color, fontSize }) => (
           <div className="metric-card" key={label}>
             <div className="metric-label">{label}</div>
             <div className="metric-value" style={{ color: color || 'inherit', fontSize: fontSize || 28 }}>{value}</div>
@@ -65,8 +81,8 @@ export default function Dashboard() {
               <BarChart data={catData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text2)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={v => fmt(v)} contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid var(--border)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid var(--border)' }} />
                 <Bar dataKey="value" fill="var(--green)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -78,10 +94,10 @@ export default function Dashboard() {
           <div style={{ padding: '1rem', height: 240 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={catData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 10 }}>
+                <Pie data={catData} cx="50%" cy="50%" outerRadius={80} dataKey="value" nameKey="name" label={(entry: any) => `${entry.name} ${((entry.percent ?? 0) * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 10 }}>
                   {catData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={v => fmt(v)} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                <Tooltip formatter={(v) => fmt(v as number)} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>

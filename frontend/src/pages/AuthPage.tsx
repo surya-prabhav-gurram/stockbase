@@ -3,17 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { IconPackage } from '../components/UI';
 
+type Mode = 'login' | 'register';
+
+interface AuthForm {
+  fullName: string;
+  email: string;
+  password: string;
+}
+
 export default function AuthPage() {
-  const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ fullName: '', email: '', password: '' });
+  const [mode, setMode] = useState<Mode>('login');
+  const [form, setForm] = useState<AuthForm>({ fullName: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: keyof AuthForm, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -24,7 +32,7 @@ export default function AuthPage() {
         await register(form.fullName, form.email, form.password);
       }
       navigate('/');
-    } catch (err) {
+    } catch (err: any) {
       setError(err.response?.data?.error || 'Authentication failed. Please try again.');
     } finally {
       setLoading(false);

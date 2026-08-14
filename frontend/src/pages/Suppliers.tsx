@@ -1,19 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { getSuppliers, getProducts, createSupplier, updateSupplier, deleteSupplier } from '../api';
 import { Loading, ConfirmModal, IconPlus, IconEdit, IconTrash, IconX } from '../components/UI';
+import { Supplier, Product, PageProps } from '../types';
 
-const empty = { name: '', contactEmail: '', phone: '', address: '', notes: '' };
+interface SupplierForm {
+  name: string;
+  contactEmail: string;
+  phone: string;
+  address: string;
+  notes: string;
+}
 
-export default function Suppliers({ onToast }) {
-  const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]);
+interface FieldConfig {
+  k: keyof SupplierForm;
+  label: string;
+  placeholder: string;
+  min: number;
+}
+
+const empty: SupplierForm = { name: '', contactEmail: '', phone: '', address: '', notes: '' };
+
+const fields: FieldConfig[] = [
+  { k: 'name', label: 'Name *', placeholder: 'Acme Wholesale', min: 200 },
+  { k: 'contactEmail', label: 'Email', placeholder: 'orders@supplier.com', min: 200 },
+  { k: 'phone', label: 'Phone', placeholder: '405-555-0100', min: 140 },
+  { k: 'address', label: 'Address', placeholder: 'City, State', min: 180 },
+];
+
+export default function Suppliers({ onToast }: PageProps) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(empty);
-  const [editing, setEditing] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [form, setForm] = useState<SupplierForm>(empty);
+  const [editing, setEditing] = useState<Supplier | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const set = <K extends keyof SupplierForm>(k: K, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
     Promise.all([getSuppliers(), getProducts()])
@@ -21,7 +45,7 @@ export default function Suppliers({ onToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const getCount = id => products.filter(p => p.supplier?.id === id).length;
+  const getCount = (id: number) => products.filter(p => p.supplier?.id === id).length;
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
@@ -37,17 +61,18 @@ export default function Suppliers({ onToast }) {
         onToast('✓ Supplier added');
       }
       setForm(empty); setEditing(null); setShowForm(false);
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
+    if (deleteId == null) return;
     try {
       await deleteSupplier(deleteId);
       setSuppliers(prev => prev.filter(s => s.id !== deleteId));
       onToast('✓ Supplier deleted');
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error deleting supplier'));
     } finally { setDeleteId(null); }
   };
@@ -67,12 +92,7 @@ export default function Suppliers({ onToast }) {
         {showForm && (
           <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--surface2)' }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              {[
-                { k: 'name', label: 'Name *', placeholder: 'Acme Wholesale', min: 200 },
-                { k: 'contactEmail', label: 'Email', placeholder: 'orders@supplier.com', min: 200 },
-                { k: 'phone', label: 'Phone', placeholder: '405-555-0100', min: 140 },
-                { k: 'address', label: 'Address', placeholder: 'City, State', min: 180 },
-              ].map(({ k, label, placeholder, min }) => (
+              {fields.map(({ k, label, placeholder, min }) => (
                 <div key={k} className="form-group" style={{ marginBottom: 0, minWidth: min }}>
                   <label>{label}</label>
                   <input className="form-control" value={form[k]} onChange={e => set(k, e.target.value)} placeholder={placeholder} />
@@ -96,7 +116,7 @@ export default function Suppliers({ onToast }) {
                   <td>{getCount(s.id)} products</td>
                   <td>
                     <div style={{ display: 'flex', gap: 2 }}>
-                      <button className="btn btn-icon btn-sm" onClick={() => { setEditing(s); setForm({ name: s.name, contactEmail: s.contactEmail||'', phone: s.phone||'', address: s.address||'', notes: s.notes||'' }); setShowForm(true); }}><IconEdit size={14} /></button>
+                      <button className="btn btn-icon btn-sm" onClick={() => { setEditing(s); setForm({ name: s.name, contactEmail: s.contactEmail || '', phone: s.phone || '', address: s.address || '', notes: s.notes || '' }); setShowForm(true); }}><IconEdit size={14} /></button>
                       <button className="btn btn-icon btn-sm btn-danger" onClick={() => setDeleteId(s.id)}><IconTrash size={14} /></button>
                     </div>
                   </td>
@@ -107,7 +127,7 @@ export default function Suppliers({ onToast }) {
         </div>
       </div>
 
-      {deleteId && <ConfirmModal message="Delete this supplier?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />}
+      {deleteId != null && <ConfirmModal message="Delete this supplier?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />}
     </div>
   );
 }

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getCategories, getProducts, createCategory, updateCategory, deleteCategory } from '../api';
 import { Loading, ConfirmModal, IconPlus, IconEdit, IconTrash, IconX } from '../components/UI';
+import { Category, Product, CategoryRequest, PageProps } from '../types';
 
-export default function Categories({ onToast }) {
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+export default function Categories({ onToast }: PageProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', description: '' });
-  const [editing, setEditing] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [form, setForm] = useState<CategoryRequest>({ name: '', description: '' });
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -18,8 +19,8 @@ export default function Categories({ onToast }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const getCount = id => products.filter(p => p.category?.id === id).length;
-  const getValue = id => products.filter(p => p.category?.id === id)
+  const getCount = (id: number) => products.filter(p => p.category?.id === id).length;
+  const getValue = (id: number) => products.filter(p => p.category?.id === id)
     .reduce((s, p) => s + Number(p.price) * p.quantity, 0);
 
   const handleSave = async () => {
@@ -36,17 +37,18 @@ export default function Categories({ onToast }) {
         onToast('✓ Category added');
       }
       setForm({ name: '', description: '' }); setEditing(null); setShowForm(false);
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
+    if (deleteId == null) return;
     try {
       await deleteCategory(deleteId);
       setCategories(prev => prev.filter(c => c.id !== deleteId));
       onToast('✓ Category deleted');
-    } catch (err) {
+    } catch (err: any) {
       onToast('✗ ' + (err.response?.data?.error || 'Error deleting category'));
     } finally { setDeleteId(null); }
   };
@@ -71,7 +73,7 @@ export default function Categories({ onToast }) {
             </div>
             <div className="form-group" style={{ marginBottom: 0, flex: 2, minWidth: 240 }}>
               <label>Description</label>
-              <input className="form-control" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+              <input className="form-control" value={form.description || ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
             </div>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : editing ? 'Save' : 'Add'}</button>
           </div>
@@ -100,7 +102,7 @@ export default function Categories({ onToast }) {
         </div>
       </div>
 
-      {deleteId && <ConfirmModal message="Delete this category?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />}
+      {deleteId != null && <ConfirmModal message="Delete this category?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />}
     </div>
   );
 }

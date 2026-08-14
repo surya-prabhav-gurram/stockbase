@@ -1,0 +1,90 @@
+# Kubernetes manifests for the StockBase backend (e.g. on AWS EKS).
+# Apply with:  kubectl apply -f k8s/
+#
+# Assumes a container image has been pushed to a registry (update `image` below)
+# and a Secret named `stockbase-secrets` holds the database URL and JWT secret.
+# A template Secret is included at the bottom — replace the values before applying
+# (in real clusters these come from a sealed secret / external secrets manager,
+# never committed).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stockbase-backend
+  labels:
+    app: stockbase-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: stockbase-backend
+  template:
+    metadata:
+      labels:
+        app: stockbase-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/surya-prabhav-gurram/stockbase-backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: CORS_ORIGINS
+              value: "https://fanciful-narwhal-46443d.netlify.app"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: stockbase-secrets, key: database-url }
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef: { name: stockbase-secrets, key: database-username }
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: stockbase-secrets, key: database-password }
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: stockbase-secrets, key: jwt-secret }
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stockbase-backend
+spec:
+  selector:
+    app: stockbase-backend
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+# Template only — replace values and manage via a secrets manager in real clusters.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stockbase-secrets
+type: Opaque
+stringData:
+  database-url: "jdbc:postgresql://YOUR_DB_HOST:5432/stockbase"
+  database-username: "stockbase"
+  database-password: "REPLACE_ME"
+  jwt-secret: "REPLACE_WITH_A_256_BIT_SECRET"
