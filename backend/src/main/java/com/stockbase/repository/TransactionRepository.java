@@ -10,5 +10,7 @@ public interface TransactionRepository extends JpaRepository<InventoryTransactio
 
     List<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(Long productId);
 
+    List<InventoryTransaction> findAllByOrderByCreatedAtDesc();
+
     List<InventoryTransaction> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

@@ -28,10 +28,9 @@ public class TransactionService {
     private final UserRepository userRepository;
 
     public List<InventoryTransaction> getAll() {
-        return transactionRepository.findAll()
-                .stream()
-                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
-                .toList();
+        // Sort in the database rather than in memory so the ordering scales
+        // with the table size instead of loading + sorting every row on the heap.
+        return transactionRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public List<InventoryTransaction> getRecent(int limit) {
@@ -44,7 +43,10 @@ public class TransactionService {
 
     @Transactional
     public InventoryTransaction record(TransactionRequest req) {
-        Product product = productRepository.findById(req.getProductId())
+        // Row-level lock held until commit: concurrent stock movements on the same
+        // product are serialised, so the read-check-write below is race-free and
+        // stock can never be oversold below zero.
+        Product product = productRepository.findByIdForUpdate(req.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + req.getProductId()));
 
         int before = product.getQuantity();

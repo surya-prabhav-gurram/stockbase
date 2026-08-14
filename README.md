@@ -3,6 +3,8 @@
 # StockBase — Full Stack Inventory Management System
 </div>
 
+![CI](https://github.com/surya-prabhav-gurram/stockbase/actions/workflows/ci.yml/badge.svg)
+
 ---
 
 ## Live Application
@@ -248,6 +250,53 @@ Neon
 
 ---
 
+## Testing & Continuous Integration
+
+The backend ships with an automated test suite covering the core business logic and security rules, run on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`).
+
+| Test | Type | What it proves |
+|---|---|---|
+| `TransactionServiceTest` | Unit (Mockito) | Stock-in/out/adjustment quantity math, insufficient-stock rejection, and the audit record (before/after quantities, performing user) |
+| `ProductServiceTest` | Unit (Mockito) | SKU uniqueness, SKU normalisation, and not-found handling for products and referenced entities |
+| `ReportServiceTest` | Unit (Mockito) | Dashboard aggregation (inventory value, stock-level counts) and CSV export shape |
+| `ProductTest` | Unit | Stock-status boundaries that drive reorder alerts |
+| `SerializationSecurityTest` | Unit | No password (hash) leaks in serialized `User` or `TransactionResponse` JSON |
+| `ProductSecurityIntegrationTest` | Integration (`@SpringBootTest` + H2) | Real filter chain + `@PreAuthorize`: reads open to any authenticated user, writes admin-only (403 for non-admin), anonymous refused, health endpoint public |
+| `StockTransactionIntegrationTest` | Integration (`@SpringBootTest` + H2) | The locked stock-movement path persists valid changes and rejects over-withdrawal, keeping stock ≥ 0 |
+| `StockbaseApplicationTests` | Integration | The full application context starts cleanly |
+
+Integration tests run against an in-memory H2 database (PostgreSQL compatibility mode), so no external database is needed.
+
+Run the suite locally:
+
+```bash
+cd backend
+mvn test
+```
+
+---
+
+## Robustness & Production Concerns
+
+- **No sensitive data over the wire.** Stock transactions are returned through a dedicated `TransactionResponse` DTO instead of the raw JPA entity, so the eagerly-loaded acting user's password hash can never be serialized to a client. The `User.password` field is additionally marked write-only as defense in depth.
+- **Concurrency-safe stock movements.** `record()` fetches the product under a pessimistic row-level write lock (`SELECT … FOR UPDATE`), so two simultaneous stock-outs on the same product are serialized and can't both pass the availability check and oversell below zero.
+- **Interactive API docs.** OpenAPI 3 with Swagger UI at `/swagger-ui.html`, including a Bearer-JWT "Authorize" flow so endpoints can be exercised from the browser.
+- **Health & metrics.** Spring Boot Actuator exposes a public `/actuator/health` (used by the Render health check) and `/actuator/info`.
+- **Pagination & sorting.** `GET /api/products/page?page=0&size=20&sort=name` for large catalogs, alongside the existing full-list endpoint.
+
+---
+
+## API Documentation & Health
+
+| Path | Purpose | Access |
+|---|---|---|
+| `/swagger-ui.html` | Interactive OpenAPI docs | Public |
+| `/v3/api-docs` | OpenAPI JSON spec | Public |
+| `/actuator/health` | Liveness/health probe | Public |
+| `/actuator/info` | Build/app info | Public |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -382,19 +431,39 @@ const api = axios.create({
 stockbase/
 ├── Dockerfile
 ├── render.yaml
+├── LICENSE
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── backend/
 │   ├── pom.xml
-│   └── src/main/java/com/stockbase/
-│       ├── StockbaseApplication.java
-│       ├── config/
-│       │   ├── SecurityConfig.java
-│       │   └── DataSeeder.java
-│       ├── controller/
-│       ├── service/
-│       ├── repository/
-│       ├── model/
-│       ├── security/
-│       └── exception/
+│   └── src/
+│       ├── main/java/com/stockbase/
+│       │   ├── StockbaseApplication.java
+│       │   ├── config/
+│       │   │   ├── SecurityConfig.java
+│       │   │   ├── OpenApiConfig.java
+│       │   │   └── DataSeeder.java
+│       │   ├── controller/
+│       │   ├── service/
+│       │   ├── repository/
+│       │   ├── model/
+│       │   ├── dto/
+│       │   │   └── TransactionResponse.java
+│       │   ├── security/
+│       │   └── exception/
+│       └── test/java/com/stockbase/
+│           ├── StockbaseApplicationTests.java
+│           ├── model/ProductTest.java
+│           ├── service/
+│           │   ├── TransactionServiceTest.java
+│           │   ├── ProductServiceTest.java
+│           │   ├── ReportServiceTest.java
+│           │   └── StockTransactionIntegrationTest.java
+│           └── security/
+│               ├── ProductSecurityIntegrationTest.java
+│               └── SerializationSecurityTest.java
 │
 └── frontend/
     ├── package.json
@@ -436,6 +505,13 @@ stockbase/
 - CSV export functionality
 - Responsive React frontend
 - Cloud-ready environment variable configuration
+- Automated unit + integration test suite (JUnit 5, Mockito, Spring Security Test, H2)
+- Continuous integration via GitHub Actions
+- Response DTOs preventing sensitive-data exposure
+- Pessimistic locking for race-free stock updates
+- OpenAPI/Swagger interactive documentation
+- Actuator health and metrics endpoints
+- Paginated and sortable list endpoints
 
 ---
 
@@ -443,14 +519,14 @@ stockbase/
 
 ```text
 Docker Compose for local development
-CI/CD pipeline with GitHub Actions
+Flyway/Liquibase schema migrations (replacing ddl-auto=update in production)
 Redis caching for reports
 WebSocket-based real-time stock alerts
 Barcode scanner support
 Multi-warehouse inventory management
 AI-based demand forecasting
 Advanced sales and purchase order modules
-Unit and integration test coverage
+Expanded controller-layer and end-to-end test coverage
 ```
 
 ---

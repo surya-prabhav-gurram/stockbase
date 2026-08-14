@@ -1,5 +1,6 @@
 package com.stockbase.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,6 +27,9 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    // Accepted on input (registration) but never serialised back to clients,
+    // so a BCrypt hash can't leak through any endpoint that returns a User.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(nullable = false)
     private String password;
 
