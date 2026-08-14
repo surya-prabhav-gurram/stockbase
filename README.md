@@ -146,57 +146,295 @@ Password: user123
 
 ---
 
-## Data Model
+## Architecture
 
-```text
-users           categories      suppliers
-  ↑                 ↑               ↑
-  └── inventory_transactions    products
-                                   │
-                              category_id
-                              supplier_id
+StockBase is a **layered, stateless full-stack application**. The React/TypeScript
+single-page app is a pure client that talks to a Spring Boot REST API over HTTPS,
+carrying a JSON Web Token on every request. The API is organized into strict layers
+(controller -> service -> repository), persists to PostgreSQL through JPA/Hibernate,
+and integrates outward to an external webhook for low-stock alerts. Because
+authentication is token-based rather than session-based, the API is horizontally
+scalable with no sticky sessions or shared session store.
+
+### 1. System context
+
+```mermaid
+flowchart LR
+    user([User / Browser])
+
+    subgraph client["Client tier — Netlify CDN"]
+        spa["React + TypeScript SPA<br/>typed Axios API client"]
+    end
+
+    subgraph app["Application tier — Render (Docker)"]
+        api["Spring Boot REST API<br/>Java 17 · stateless JWT"]
+    end
+
+    subgraph data["Data tier — Neon"]
+        db[("PostgreSQL")]
+    end
+
+    ext["External webhook<br/>Slack / Teams compatible"]
+
+    user -->|HTTPS| spa
+    spa -->|"JSON / HTTPS<br/>Authorization: Bearer JWT"| api
+    api -->|"JDBC · JPA / Hibernate"| db
+    api -->|"HTTP POST<br/>low-stock alerts"| ext
 ```
 
----
+### 2. Request lifecycle
 
-## System Architecture
+Every API call flows through the same pipeline. Security is enforced twice: once at
+the URL level in the filter chain, and again at the method level via `@PreAuthorize`.
+Controllers return **DTOs**, never JPA entities, so persistence internals never reach
+the client.
 
-```text
-Client Browser
-     │
-     ▼
-React Frontend
-     │
-     ▼
-Axios API Layer
-     │
-     ▼
-Spring Boot REST API
-     │
-     ▼
-Spring Security + JWT
-     │
-     ▼
-Spring Data JPA / Hibernate
-     │
-     ▼
-Neon PostgreSQL Database
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser (React)
+    participant F as Filter chain<br/>CORS + JwtFilter
+    participant C as Controller
+    participant P as @PreAuthorize
+    participant S as Service<br/>@Transactional
+    participant R as Repository (JPA)
+    participant DB as PostgreSQL
+
+    B->>F: HTTP request + Bearer JWT
+    F->>F: Validate token, load user,<br/>set SecurityContext
+    F->>C: Dispatch to handler
+    C->>P: Method-level role check
+    P-->>C: Allow (or throw AccessDenied -> 403)
+    C->>S: Invoke business method
+    S->>R: Query / persist (tx-bounded)
+    R->>DB: SQL within transaction
+    DB-->>R: Result set
+    R-->>S: Entities
+    S-->>C: Domain result
+    C-->>B: JSON response DTO + HTTP status
 ```
 
----
+### 3. Backend layered design
 
-## Cloud Deployment Architecture
+Dependencies point strictly downward (web -> service -> persistence). Cross-cutting
+concerns are isolated in their own packages and applied via Spring (filters, AOP,
+advice) rather than being tangled into business code.
 
-```text
-Netlify
-  └── Hosts React production build
+```mermaid
+flowchart TD
+    subgraph web["Web layer — controller/"]
+        ctrl["REST controllers<br/>validation · @PreAuthorize"]
+    end
 
-Render
-  └── Runs Spring Boot backend inside Docker container
+    subgraph service["Service layer"]
+        svc["service/<br/>business logic · @Transactional"]
+        notif["notification/<br/>external integration"]
+    end
 
-Neon
-  └── Hosts PostgreSQL production database
+    subgraph persistence["Persistence layer"]
+        repo["repository/<br/>Spring Data JPA"]
+        model["model/<br/>JPA entities + domain methods"]
+    end
+
+    subgraph cross["Cross-cutting concerns"]
+        sec["security/<br/>JwtFilter · JwtUtil"]
+        dto["dto/<br/>API response models"]
+        exc["exception/<br/>@RestControllerAdvice"]
+        cfg["config/<br/>Security · OpenAPI · Scheduling"]
+    end
+
+    ctrl --> svc
+    ctrl --> notif
+    ctrl --> dto
+    svc --> repo
+    notif --> repo
+    repo --> model
+    sec -. applies to .-> ctrl
+    exc -. wraps .-> ctrl
+    cfg -. configures .-> sec
 ```
+
+### 4. Domain model
+
+The product quantity is effectively a projection of the transaction ledger: every
+stock movement writes an immutable `InventoryTransaction` capturing who did what,
+when, and the before/after quantities.
+
+```mermaid
+erDiagram
+    USER ||--o{ INVENTORY_TRANSACTION : performs
+    PRODUCT ||--o{ INVENTORY_TRANSACTION : "is moved by"
+    CATEGORY ||--o{ PRODUCT : classifies
+    SUPPLIER ||--o{ PRODUCT : supplies
+
+    USER {
+        bigint id PK
+        string fullName
+        string email UK
+        string password "BCrypt · JSON write-only"
+        enum role "ADMIN or USER"
+        instant createdAt
+    }
+    PRODUCT {
+        bigint id PK
+        string name
+        string sku UK
+        decimal price
+        int quantity
+        int reorderThreshold
+        bigint category_id FK
+        bigint supplier_id FK
+    }
+    CATEGORY {
+        bigint id PK
+        string name UK
+        string description
+    }
+    SUPPLIER {
+        bigint id PK
+        string name
+        string contactEmail
+        string phone
+    }
+    INVENTORY_TRANSACTION {
+        bigint id PK
+        enum type "STOCK_IN / STOCK_OUT / ADJUSTMENT"
+        int quantity
+        int quantityBefore
+        int quantityAfter
+        string reason
+        bigint product_id FK
+        bigint performed_by FK
+        instant createdAt
+    }
+```
+
+### 5. Authentication & authorization
+
+Stateless JWT. A login mints a signed token; every subsequent request is
+authenticated by a `OncePerRequestFilter` that validates the token and populates the
+`SecurityContext`, which method-level `@PreAuthorize` rules then read.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant Auth as AuthController
+    participant JU as JwtUtil
+    participant JF as JwtFilter
+    participant EP as Secured endpoint
+
+    rect rgb(238,246,242)
+    note over B,JU: Login
+    B->>Auth: POST /api/auth/login (email, password)
+    Auth->>Auth: authenticate (BCrypt verify)
+    Auth->>JU: generateToken(userDetails)
+    JU-->>Auth: signed JWT (HS256, exp)
+    Auth-->>B: { token, id, fullName, email, role }
+    end
+
+    rect rgb(245,247,250)
+    note over B,EP: Authenticated request
+    B->>JF: request + Authorization: Bearer JWT
+    JF->>JU: validate signature + expiry, extract subject
+    JU-->>JF: valid
+    JF->>JF: set SecurityContext (authorities)
+    JF->>EP: forward
+    EP-->>B: 200 OK (or 403 if role check fails)
+    end
+```
+
+**Authorization matrix**
+
+| Endpoint group | Anonymous | USER | ADMIN |
+|---|:---:|:---:|:---:|
+| `POST /api/auth/**`, `/actuator/health`, `/swagger-ui/**` | ✅ | ✅ | ✅ |
+| `GET /api/**` (reads) | ❌ | ✅ | ✅ |
+| `POST/PUT/DELETE /api/**` (writes) | ❌ | ❌ | ✅ |
+
+### 6. Concurrency control
+
+Recording a stock movement is a read-check-write sequence, which is a classic race.
+The service fetches the product under a **pessimistic write lock**
+(`SELECT ... FOR UPDATE` via `@Lock(PESSIMISTIC_WRITE)`), so concurrent movements on
+the same product are serialized and stock can never be oversold below zero.
+
+```mermaid
+sequenceDiagram
+    participant A as Tx A — stock-out 4
+    participant B as Tx B — stock-out 4
+    participant DB as products row (qty = 5)
+
+    A->>DB: SELECT ... FOR UPDATE  (locks row)
+    B->>DB: SELECT ... FOR UPDATE  (blocks)
+    A->>DB: 5 >= 4 ✓  UPDATE qty = 1  COMMIT
+    DB-->>B: lock released, B reads qty = 1
+    B->>B: 1 >= 4 ✗  reject → 400 BadRequest
+```
+
+### 7. Low-stock external integration
+
+Decoupled from the write path: a scheduled sweep (and an on-demand admin endpoint)
+find newly-low products, de-duplicate them, and push alerts through a
+`NotificationSender` interface. A missing webhook URL degrades gracefully to logging,
+and any send failure is contained so it can never break a stock operation.
+
+```mermaid
+flowchart LR
+    sch["@Scheduled sweep (cron)"] --> notifier
+    adm["POST /api/notifications/low-stock/run<br/>(ADMIN)"] --> notifier
+    notifier["LowStockNotifier<br/>find low + de-dup"]
+    notifier -. reads .-> pr[("products")]
+    notifier --> sender{{"NotificationSender<br/>(interface)"}}
+    sender --> impl["WebhookNotificationSender<br/>Spring RestClient"]
+    impl -->|URL configured| hook["External webhook"]
+    impl -->|URL blank| logp["Log only"]
+```
+
+### 8. Deployment topology
+
+```mermaid
+flowchart TD
+    dev["Developer"] -->|git push| gh["GitHub (main)"]
+    gh --> ci["GitHub Actions CI<br/>mvn verify · npm build"]
+    gh -->|publish build| netlify["Netlify<br/>React static build (CDN)"]
+    gh -->|deploy image| render["Render<br/>Spring Boot in Docker"]
+    render --> neon[("Neon<br/>PostgreSQL")]
+    netlify -->|"/api → HTTPS"| render
+    render --> health["/actuator/health<br/>(health probe)"]
+
+    subgraph alt["Alternative packaging (in-repo)"]
+        compose["docker-compose.yml<br/>Postgres + backend"]
+        k8s["k8s/backend.yaml<br/>Deployment + Service<br/>+ liveness/readiness probes"]
+    end
+```
+
+### Component responsibilities
+
+| Package | Responsibility | Representative types |
+|---|---|---|
+| `controller/` | HTTP endpoints, request validation, method-level authorization, DTO mapping | `ProductController`, `TransactionController`, `NotificationController` |
+| `service/` | Business rules, transaction boundaries, orchestration | `TransactionService`, `ProductService`, `ReportService` |
+| `repository/` | Data access via Spring Data JPA, incl. the pessimistic-lock fetch | `ProductRepository`, `TransactionRepository` |
+| `model/` | JPA entities + small domain methods (`isLowStock()`) | `Product`, `InventoryTransaction`, `User` |
+| `dto/` | Response models that decouple the API from entities | `TransactionResponse` |
+| `security/` | Stateless JWT auth: filter, token utility, user details | `JwtFilter`, `JwtUtil`, `StockbaseUserDetailsService` |
+| `exception/` | Central error handling → consistent JSON, correct status codes | `GlobalExceptionHandler` |
+| `notification/` | External integration (find low stock → webhook) | `LowStockNotifier`, `NotificationSender`, `WebhookNotificationSender` |
+| `config/` | Security chain, OpenAPI/Swagger, scheduling | `SecurityConfig`, `OpenApiConfig`, `SchedulingConfig` |
+
+### Key architectural decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Authentication | Stateless JWT (no server session) | Horizontal scalability; no sticky sessions or shared session store |
+| Concurrency | Pessimistic row lock (`SELECT ... FOR UPDATE`) | Guarantees no oversell with **no schema migration** on already-deployed data; chosen over optimistic `@Version` |
+| API contract | DTOs separate from JPA entities | Prevents leaking entity internals (e.g. password hash) and decouples wire format from schema |
+| Error handling | Central `@RestControllerAdvice` | Consistent JSON errors, correct status codes (e.g. 403 vs 500), no internal detail leakage |
+| Front end | React + TypeScript (SPA) | Type-safe end-to-end contract; a Next.js/SSR rewrite adds no value for an authenticated dashboard |
+| Integration | Interface + decoupled sweep | Unit-testable seam; notification failures never block core writes |
+| Rendering of low stock | Domain method on the entity | Single source of truth reused by dashboard, reports, and alerts |
+| Schema management | Hibernate auto-DDL (`update`) | Sufficient for this scope; Flyway migrations noted as the production next step |
 
 ---
 
