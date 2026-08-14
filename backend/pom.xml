@@ -111,7 +111,9 @@
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
-      <scope>test</scope>
+      <!-- runtime (not test) so the 'local' profile can run on in-memory H2
+           with zero database setup; production still uses PostgreSQL. -->
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 

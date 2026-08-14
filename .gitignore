@@ -16,7 +16,6 @@ yarn-error.log*
 .env
 .env.*
 *.local
-application-local.properties
 
 # ── IDE / editor ──────────────────────────────
 .idea/
